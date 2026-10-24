@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DockhandCLI.Core/DockhandCLI.Core.csproj" />
+    <Project Path="src/DockhandCLI.Infrastructure/DockhandCLI.Infrastructure.csproj" />
+    <Project Path="src/DockhandCLI/DockhandCLI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DockhandCLI.IntegrationTests/DockhandCLI.IntegrationTests.csproj" />
+    <Project Path="tests/DockhandCLI.UnitTests/DockhandCLI.UnitTests.csproj" />
+  </Folder>
+</Solution>

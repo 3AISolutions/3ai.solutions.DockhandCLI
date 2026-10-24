@@ -40,7 +40,11 @@ Relevant operations:
    with the password → store the returned token → `POST /api/auth/logout`. The password is never stored.
    OIDC/passkey logins are browser flows and are **not supported** from the CLI; those users import a token.
 
-After storing, validate with `GET /api/auth/session` (`authenticated == true`).
+**Verifying a token.** `GET /api/auth/session` and `GET /api/profile` read only the session *cookie*
+(confirmed in Dockhand's route handlers), so with a Bearer token they report `authenticated: false` even
+when the token is valid. The CLI therefore uses `/api/auth/session` only to learn `authEnabled`, and
+proves the token with an authenticated call (`GET /api/environments`; an invalid token gets a 401 from
+the auth hook). As a consequence the CLI cannot show which user a Bearer token belongs to.
 Because of the 10-failure rate limit, the CLI never retries a 401.
 
 ## 3. Environments
@@ -82,9 +86,27 @@ Apply rules: exact name or id match only (no fuzzy / prefix guessing; ambiguous 
 per-container `success` flag in the response; no automatic retry. "Preserving all settings" is the API's
 claim — the CLI repeats it as the API's statement, not as a guarantee.
 
-**Display limitation:** "available image" can only be shown if the undocumented `results` items (fresh check)
-or `newerVersion` (pending) contain it. The CLI will render known fields and pass unknown JSON through in
-`--output json`.
+**Result fields.** The spec leaves the fresh-check `results` items untyped. Dockhand's route handler
+(`UpdateCheckResult` in `src/routes/api/containers/check-updates/+server.ts`) defines them as
+`{containerId, containerName, imageName, hasUpdate, releaseAgeRemainingHours?, currentDigest?, newDigest?,
+error?, isLocalImage?, systemContainer?, updateDisabled?, newerVersion?: {tag, bump, skipped, digest?},
+pinnedToDigest?}`. The CLI shows these. Note that an update keeps the *same tag*: "available image" means a
+new digest (`currentDigest → newDigest`); a different tag is only an advisory `newerVersion` and is never
+applied by `batch-update`.
+
+### Job protocol (differs from the spec text)
+
+The spec describes `check-updates` POST and the stack deploy/restart routes as Server-Sent Event streams.
+Dockhand's current implementation (`createJobResponse` in `src/lib/server/sse.ts`) instead:
+
+- with `Accept: application/json` (and without `text/event-stream`): blocks and returns the final result as JSON;
+- otherwise: returns `{jobId}` immediately; the client polls `GET /api/jobs/{id}` →
+  `{id, status: running|done|error, lines: [{event, data}], result}`. Finished jobs are kept for 10 minutes.
+
+The CLI sends `Accept: text/event-stream, application/json` and handles all three shapes: a `{jobId}` is
+polled (progress comes from `progress` lines), an SSE stream is read, and any other JSON is taken as the
+final result. Polling avoids reverse-proxy timeouts on long synchronous requests. On Ctrl+C the CLI asks
+the server to cancel the job (`DELETE /api/jobs/{id}`).
 
 ## 5. Other v1 command groups
 
@@ -96,10 +118,10 @@ or `newerVersion` (pending) contain it. The CLI will render known fields and pas
 | `containers start/stop/restart/pause/unpause <c>` | `POST /api/containers/{id}/{action}?env=` (stop/pause/restart confirmed) |
 | `images list` | `GET /api/images?env=` (item schema loosely documented) |
 | `stacks list` / `stacks show <name>` | `GET /api/stacks?env=`, `GET /api/stacks/{name}/compose?env=` |
-| `stacks start/stop <name>` | `POST /api/stacks/{name}/start|stop?env=` → job id; poll `GET /api/jobs/{id}` |
-| `stacks restart <name> [--mode]` | `POST /api/stacks/{name}/restart?env=&mode=` (SSE job stream) |
-| `stacks deploy <name> [--pull --build --force-recreate]` | `POST /api/stacks/{name}/deploy?env=` (SSE job stream) |
-| `stacks down <name> [--remove-volumes]` | `POST /api/stacks/{name}/down?env=` → job id (confirmed; `--remove-volumes` double-confirmed) |
+| `stacks start/stop <name>` | `POST /api/stacks/{name}/start|stop?env=` (job; result `{success, output|error}`) |
+| `stacks restart <name> [--mode]` | `POST /api/stacks/{name}/restart?env=&mode=` (job) |
+| `stacks deploy <name> [--pull --build --force-recreate]` | `POST /api/stacks/{name}/deploy?env=` (job) |
+| `stacks down <name> [--remove-volumes]` | `POST /api/stacks/{name}/down?env=` (job; confirmed, with an explicit data-loss warning for `--remove-volumes`) |
 | `jobs show <id>` / `jobs cancel <id>` | `GET` / `DELETE /api/jobs/{id}` |
 | `health` | `GET /api/health` (public), `GET /api/health/database` |
 | `system [--env]` | `GET /api/system?env=` |
@@ -109,8 +131,12 @@ or `newerVersion` (pending) contain it. The CLI will render known fields and pas
 
 - No endpoint lists jobs; only `GET`/`DELETE /api/jobs/{id}`. `jobs list` is unsupported.
 - No documented default environment.
-- `check-updates` POST result item schema, `newerVersion`, image list items and stack list items are
-  untyped in the spec; models will tolerate extra/missing fields.
+- `check-updates` POST result items, `newerVersion` and stack list items are untyped in the spec; the CLI
+  uses the field names from Dockhand's source (see above) and keeps any unknown fields in `--output json`.
+- The Bearer token's user cannot be determined (session and profile routes are cookie-only).
+- `batch-update` returns only after all containers are recreated; there is no per-container progress
+  unless the streaming variant is used. The CLI uses the plain variant because its response is fully
+  documented, and shows a spinner meanwhile.
 - Token creation needs a cookie session; Bearer-authenticated callers cannot mint tokens.
 - OIDC and passkey logins are browser-only.
 

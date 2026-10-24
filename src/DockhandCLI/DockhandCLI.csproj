@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>dockhand</AssemblyName>
+    <RootNamespace>DockhandCLI</RootNamespace>
+    <Description>Command-line client for managing Dockhand installations.</Description>
+  </PropertyGroup>
+
+  <!-- Applied when publishing with a runtime identifier, e.g. dotnet publish -r linux-x64 -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DockhandCLI.Core\DockhandCLI.Core.csproj" />
+    <ProjectReference Include="..\DockhandCLI.Infrastructure\DockhandCLI.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="Spectre.Console.Cli" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DockhandCLI.UnitTests" />
+    <InternalsVisibleTo Include="DockhandCLI.IntegrationTests" />
+  </ItemGroup>
+
+</Project>
