@@ -229,10 +229,17 @@ ordinary requests time out after 100 seconds or the endpoint's `--request-timeou
 Running `dockhand` without a command starts a shell (`dockhand -srv02` starts it with srv02 active):
 
 ```text
-Dockhand CLI v1.0.0
+╭────────────────────────────────────────────────────────────╮
+│ ✻ Dockhand CLI v1.0.0                                      │
+│                                                            │
+│ endpoint: srv01                                            │
+│                                                            │
+│ / for commands · ↑↓ history · Tab completes · Ctrl+D exits │
+╰────────────────────────────────────────────────────────────╯
 
-Default endpoint: srv01
-Type /command for help.
+dockhand [srv01] > /ch
+❯ /check updates                          Check containers for image updates (--pending, --cached,…
+  /check apply update docker <container>  Update a container to its latest image (--dry-run, --yes)
 
 dockhand [srv01] > /command
 dockhand [srv01] > endpoint list
@@ -245,6 +252,9 @@ dockhand [srv02] > /check apply update docker nginx
 dockhand [srv02] > /exit
 ```
 
+- Typing `/` opens a command picker that filters as you type (`/logs` finds `containers logs`).
+  Up/Down select, Tab completes, Enter runs the command (or fills it in when it still needs
+  arguments), Esc closes the picker.
 - Every command from direct mode works, with or without the leading `/`; they run the same code.
 - `/command` (or `/help`) lists commands; `/command check updates` shows the detailed help.
 - `use <alias>` switches the endpoint for this session only; `-<alias>` targets another endpoint for one command.

@@ -506,17 +506,22 @@ internal sealed class DockhandApiClient : IDockhandApi
     private DockhandException NetworkError(HttpRequestException ex)
     {
         var target = $"'{Endpoint.Alias}' ({Endpoint.BaseUrl})";
-        var cause = ex.InnerException is { } inner ? $"{ex.Message} {inner.Message}" : ex.Message;
+        // The outer message usually repeats the inner one with the address appended.
+        var cause = ex.InnerException is { } inner && !ex.Message.StartsWith(inner.Message.TrimEnd('.'), StringComparison.Ordinal)
+            ? $"{ex.Message} {inner.Message}"
+            : ex.Message;
         var message = ex.HttpRequestError switch
         {
             HttpRequestError.NameResolutionError => $"Could not resolve the host of {target}.",
             HttpRequestError.SecureConnectionError =>
-                $"TLS connection to {target} failed: {ex.InnerException?.Message ?? ex.Message} Certificate validation is always enforced; install the server's CA certificate in your OS trust store.",
-            HttpRequestError.ConnectionError => $"Could not connect to {target}: {cause}",
-            _ => $"Request to {target} failed: {cause}",
+                $"TLS connection to {target} failed. {Sentence(ex.InnerException?.Message ?? ex.Message)} Certificate validation is always enforced; install the server's CA certificate in your OS trust store.",
+            HttpRequestError.ConnectionError => $"Could not connect to {target}. {cause}",
+            _ => $"Request to {target} failed. {cause}",
         };
         return new DockhandException(ExitCodes.Network, SecretRedactor.Redact(message), ex);
     }
+
+    private static string Sentence(string text) => text.EndsWith('.') ? text : text + ".";
 
     internal static string? ExtractMessage(string body)
     {

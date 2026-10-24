@@ -70,6 +70,30 @@ internal sealed class ShellCompleter(Func<IReadOnlyList<string>> aliases)
         return new Completion(wordStart, matches);
     }
 
+    /// <summary>
+    /// Commands for the <c>/</c> picker: entries whose path starts with what follows the slash, then (for a
+    /// single word) entries with a later word starting with it, so <c>/logs</c> finds <c>containers logs</c>.
+    /// Empty once the line goes past a command path (arguments typed) or does not start with a slash.
+    /// </summary>
+    public IReadOnlyList<CatalogEntry> MatchCommands(string line)
+    {
+        if (!line.StartsWith('/'))
+        {
+            return [];
+        }
+
+        var typed = line[1..];
+        var all = CommandCatalog.Entries.Concat(CommandCatalog.ShellCommands).ToList();
+        var matches = all.Where(e => e.Path.StartsWith(typed, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (typed.Length > 0 && !typed.Contains(' '))
+        {
+            matches.AddRange(all.Where(e => !matches.Contains(e)
+                && e.Words.Skip(1).Any(w => w.StartsWith(typed, StringComparison.OrdinalIgnoreCase))));
+        }
+
+        return matches;
+    }
+
     /// <summary>The command words typed so far, without options and option values.</summary>
     private static List<string> CommandPath(List<string> previous)
     {

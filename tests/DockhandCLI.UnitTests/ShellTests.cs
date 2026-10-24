@@ -1,4 +1,5 @@
 using DockhandCLI.Commands;
+using DockhandCLI.Hosting;
 using DockhandCLI.Core.Services;
 using DockhandCLI.Shell;
 
@@ -29,6 +30,47 @@ public class CommandLineTokenizerTests
 public class ShellCompleterTests
 {
     private readonly ShellCompleter _completer = new(() => ["srv01", "srv02", "prod"]);
+
+    [Fact]
+    public void Slash_alone_lists_every_command()
+    {
+        var matches = _completer.MatchCommands("/");
+        Assert.Equal(CommandCatalog.Entries.Count + CommandCatalog.ShellCommands.Count, matches.Count);
+    }
+
+    [Fact]
+    public void Slash_filters_by_path_prefix_then_by_later_words()
+    {
+        Assert.Equal(["check updates", "check apply update docker"], _completer.MatchCommands("/check").Select(e => e.Path));
+        Assert.Equal(["containers logs"], _completer.MatchCommands("/logs").Select(e => e.Path));
+
+        var update = _completer.MatchCommands("/upd").Select(e => e.Path).ToList();
+        Assert.Equal("update apply", update[0]);
+        Assert.Contains("check updates", update);
+    }
+
+    [Theory]
+    [InlineData("check")]
+    [InlineData("/check updates ")]
+    [InlineData("/containers logs nginx")]
+    [InlineData("/nothing")]
+    public void Slash_menu_closes_without_a_matching_command(string line) =>
+        Assert.Empty(_completer.MatchCommands(line));
+
+    [Fact]
+    public void Menu_rows_scroll_with_the_selection_and_fit_the_width()
+    {
+        var entries = _completer.MatchCommands("/");
+        var first = 0;
+
+        var lines = LineEditor.MenuLines(entries, selected: 10, ref first, width: 80);
+
+        Assert.Equal(3, first);
+        Assert.Equal(9, lines.Count); // 8 rows and the position footer
+        Assert.Contains("❯ /", lines[7].Markup);
+        Assert.All(lines, l => Assert.True(l.Length < 80));
+        Assert.Contains("11/", lines[^1].Markup);
+    }
 
     [Fact]
     public void Completes_top_level_commands_and_shell_words()
@@ -111,4 +153,18 @@ public class SecretRedactorTests
     [Fact]
     public void Token_environment_variable_name() =>
         Assert.Equal("DOCKHAND_TOKEN_PROD_EU_1", TokenEnvironment.VariableFor("prod.eu-1"));
+}
+
+public class ErrorRendererTests
+{
+    [Theory]
+    [InlineData("Unknown endpoint alias 'nope' (from '-nope'). Run 'dockhand endpoint list' to see registered aliases.",
+        new[] { "Unknown endpoint alias 'nope' (from '-nope').", "Run 'dockhand endpoint list' to see registered aliases." })]
+    [InlineData("Could not connect to 'tmp' (http://127.0.0.1:1). Refused it. (127.0.0.1:1)",
+        new[] { "Could not connect to 'tmp' (http://127.0.0.1:1).", "Refused it. (127.0.0.1:1)" })]
+    [InlineData("Not found (HTTP 404: Gone. Try later).", new[] { "Not found (HTTP 404: Gone. Try later)." })]
+    [InlineData("Invalid date 'x. Y'. Use e.g. 2027-12-31.", new[] { "Invalid date 'x. Y'.", "Use e.g. 2027-12-31." })]
+    [InlineData("Don't do it. Really.", new[] { "Don't do it.", "Really." })]
+    public void Splits_messages_into_headline_and_hints(string message, string[] expected) =>
+        Assert.Equal(expected, ErrorRenderer.SplitSentences(message));
 }

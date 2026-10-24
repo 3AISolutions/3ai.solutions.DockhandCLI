@@ -53,7 +53,7 @@ internal static class CommandCatalog
     public static readonly IReadOnlyList<CatalogEntry> ShellCommands =
     [
         new("command", "[name]", "List commands, or show detailed help for one (alias: /help)"),
-        new("use", "<alias>", "Switch the active endpoint for this session (the saved default is unchanged)"),
+        new("use", "[alias]", "Switch the active endpoint for this session (the saved default is unchanged)"),
         new("history", "", "Show command history"),
         new("clear", "", "Clear the screen"),
         new("exit", "", "Leave the shell (alias: /quit)"),

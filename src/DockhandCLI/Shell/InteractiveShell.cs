@@ -66,7 +66,7 @@ internal sealed class InteractiveShell(
                 }
                 catch (FormatException ex)
                 {
-                    _console.Error.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+                    ErrorRenderer.WriteError(_console, ex.Message, inShell: true);
                     exitCode = ExitCodes.Usage;
                     continue;
                 }
@@ -158,7 +158,7 @@ internal sealed class InteractiveShell(
 
         if (args.Count != 2)
         {
-            _console.Error.MarkupLine("[red]Error:[/] Usage: use <alias>");
+            ErrorRenderer.WriteError(_console, "Usage: use <alias>");
             return ExitCodes.Usage;
         }
 
@@ -166,7 +166,7 @@ internal sealed class InteractiveShell(
         var endpoint = _config.FindEndpoint(alias);
         if (endpoint is null)
         {
-            _console.Error.MarkupLine($"[red]Error:[/] {Markup.Escape(EndpointService.UnknownAlias(_config, alias).Message)}");
+            ErrorRenderer.WriteError(_console, EndpointService.UnknownAlias(_config, alias).Message, inShell: true);
             return ExitCodes.NotFound;
         }
 
@@ -203,22 +203,27 @@ internal sealed class InteractiveShell(
 
     private void PrintBanner()
     {
-        _console.Output.MarkupLine($"[bold]Dockhand CLI[/] v{Markup.Escape(CliApplication.Version)}");
-        _console.Output.WriteLine();
+        var lines = new List<string> { $"[cyan]✻[/] [bold]Dockhand CLI[/] [grey]v{Markup.Escape(CliApplication.Version)}[/]", "" };
         if (_config.Endpoints.Count == 0)
         {
-            _console.Output.MarkupLine("No endpoints yet. Add one with: [green]endpoint add <alias> <url>[/]");
+            lines.Add("No endpoints yet. Add one with [green]/endpoint add <alias> <url>[/]");
         }
         else
         {
-            _console.Output.MarkupLine($"Default endpoint: [yellow]{Markup.Escape(_config.DefaultEndpoint ?? "(none)")}[/]");
+            lines.Add($"[grey]endpoint:[/] [yellow]{Markup.Escape(ActiveAlias() ?? "(none)")}[/]");
             if (context.SessionEndpoint is { } active && !string.Equals(active, _config.DefaultEndpoint, StringComparison.OrdinalIgnoreCase))
             {
-                _console.Output.MarkupLine($"Active endpoint: [yellow]{Markup.Escape(active)}[/]");
+                lines.Add($"[grey]default:[/]  {Markup.Escape(_config.DefaultEndpoint ?? "(none)")}");
             }
         }
 
-        _console.Output.MarkupLine("Type [green]/command[/] for help.");
+        lines.Add("");
+        lines.Add("[grey]/ for commands · ↑↓ history · Tab completes · Ctrl+D exits[/]");
+
+        _console.Output.Write(new Panel(new Markup(string.Join('\n', lines)))
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .Padding(1, 0));
         _console.Output.WriteLine();
     }
 
@@ -248,7 +253,7 @@ internal sealed class InteractiveShell(
         }
         catch (DockhandException ex)
         {
-            _console.Error.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+            ErrorRenderer.WriteError(_console, ex.Message, inShell: true);
         }
     }
 }

@@ -68,7 +68,7 @@ internal sealed class CliApplication(
         }
         catch (DockhandException ex)
         {
-            ErrorRenderer.Render(consoleFactory.Create(GlobalOptions.Default), ex, verbose: false);
+            ErrorRenderer.Render(consoleFactory.Create(GlobalOptions.Default), ex, verbose: false, context.InShell);
             return null;
         }
     }
@@ -98,7 +98,7 @@ internal sealed class CliApplication(
         }
         catch (Exception ex)
         {
-            return ErrorRenderer.Render(context.Console, ex, parsed.Options.Verbose);
+            return ErrorRenderer.Render(context.Console, ex, parsed.Options.Verbose, context.InShell);
         }
     }
 }
