@@ -218,7 +218,8 @@ internal static class PathEntries
     {
         try
         {
-            return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path.Trim('"')));
+            // Windows separators, trimmed explicitly so this behaves the same when tests run on Linux.
+            return Path.GetFullPath(path.Trim('"')).TrimEnd('\\', '/');
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
