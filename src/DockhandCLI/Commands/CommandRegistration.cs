@@ -118,6 +118,17 @@ internal static class CommandRegistration
             jobs.AddCommand<JobCancelCommand>("cancel").WithDescription("Request cancellation of a running job");
         });
 
+        config.AddBranch("self", self =>
+        {
+            self.SetDescription("Install and update dockhand itself");
+            self.AddCommand<SelfPathCommand>("path").WithDescription("Add this executable's folder to your PATH (replacing older dockhand entries)")
+                .WithExample("self", "path")
+                .WithExample("self", "path", "--remove");
+            self.AddCommand<SelfUpdateCommand>("update").WithDescription("Update dockhand to the latest release")
+                .WithExample("self", "update", "--check")
+                .WithExample("self", "update");
+        });
+
         config.AddCommand<HealthCommand>("health").WithDescription("Check the health of an endpoint (no token needed)");
         config.AddCommand<SystemCommand>("system").WithDescription("Show Dockhand host, runtime and Docker information");
     }

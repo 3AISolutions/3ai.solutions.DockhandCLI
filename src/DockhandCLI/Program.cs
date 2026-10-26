@@ -1,5 +1,6 @@
 using System.Text;
 using DockhandCLI.Hosting;
+using DockhandCLI.Infrastructure.SelfManagement;
 using Microsoft.Extensions.DependencyInjection;
 
 try
@@ -10,6 +11,8 @@ catch (IOException)
 {
     // No console attached; output is redirected.
 }
+
+InstallLocation.DeleteLeftovers();
 
 await using var services = CliHost.BuildServices();
 var context = services.GetRequiredService<InvocationContext>();

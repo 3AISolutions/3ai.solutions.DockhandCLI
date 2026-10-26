@@ -62,10 +62,37 @@ On macOS, a downloaded binary is quarantined by Gatekeeper; clear the flag once 
 
 ```powershell
 Expand-Archive dockhand-v1.0.0-win-x64.zip -DestinationPath "$env:LOCALAPPDATA\Programs\dockhand"
-[Environment]::SetEnvironmentVariable("Path", "$([Environment]::GetEnvironmentVariable('Path','User'));$env:LOCALAPPDATA\Programs\dockhand", "User")
+& "$env:LOCALAPPDATA\Programs\dockhand\dockhand.exe" self path
 # open a new terminal, then:
 dockhand --version
 ```
+
+### Adding dockhand to PATH
+
+`dockhand self path` puts the folder of the executable you run on your user `PATH`, so `dockhand`
+works from any terminal. Run it again after moving the executable: it updates the entry.
+
+- **Windows:** edits the user `PATH` (`HKCU\Environment`, no admin needed) and keeps `%VAR%` entries intact.
+  Older entries for folders that hold nothing but dockhand files are replaced; any other copy of
+  `dockhand.exe` on `PATH` is reported as a warning.
+- **Linux / macOS:** writes a marked block (`# >>> dockhand >>>`) to the shell profiles that exist
+  (`~/.profile`, `~/.bash_profile`, `~/.bashrc`, `~/.zshrc`), creating the one your `$SHELL` reads if
+  needed, plus `~/.config/fish/conf.d/dockhand.fish` for fish. Running it again replaces the block.
+
+`dockhand self path --remove` takes it off again. Open a new terminal for either change to take effect.
+
+### Updating dockhand
+
+```bash
+dockhand self update --check   # is there a newer release?
+dockhand self update           # download and install it
+```
+
+`self update` downloads the archive for your platform from the latest GitHub release, verifies it
+against the release's `SHA256SUMS.txt`, runs the new executable once to confirm it works, then replaces
+the running one in place. If any step fails, the installed executable is left untouched. When dockhand
+is installed in a folder you cannot write to (e.g. `/usr/local/bin`), run it with `sudo` (or from an
+elevated terminal on Windows). It only updates released single-file executables, not `dotnet build` output.
 
 ## Build from source
 
@@ -425,6 +452,8 @@ dockhand -srv01 check updates -o json \
 | `jobs show <id>` / `jobs cancel <id>` | Inspect or cancel a background job |
 | `health` | Service and database health (no token needed) |
 | `system` | Host, runtime, database and Docker information (`--env` adds Docker details) |
+| `self path` | Add the executable's folder to your PATH, replacing older dockhand entries (`--remove`) |
+| `self update` | Update to the latest GitHub release (`--check`, `--force`) |
 
 Every command accepts the [global options](#direct-command-line-mode) and `--help`.
 
@@ -453,6 +482,8 @@ Every command accepts the [global options](#direct-command-line-mode) and `--hel
 - Tokens are masked everywhere they are shown (`dh_…x9Qa`); log and error text is scrubbed of anything
   token-shaped. HTTP headers are never logged, even with `--verbose`.
 - Redirects are not followed, so a token is never forwarded to another host.
+- `self update` talks only to GitHub, sends no credentials, and installs a download only after its
+  SHA-256 matches the release's `SHA256SUMS.txt` and the new executable reports the expected version.
 - Configuration and secret files are written atomically (temporary file + rename) under a lock, with
   mode `0600` (directory `0700`) on Linux and macOS. A failed request never rewrites the configuration.
 - Mutating commands confirm first; `--dry-run` on updates sends no mutating request; failed updates are
@@ -481,7 +512,7 @@ DockhandCLI.slnx
 ├── src/
 │   ├── DockhandCLI/                  # executable "dockhand": commands, shell, presentation, hosting
 │   ├── DockhandCLI.Core/             # models, interfaces, services (parsing, resolution, updates)
-│   └── DockhandCLI.Infrastructure/   # Dockhand API client, configuration and secret storage
+│   └── DockhandCLI.Infrastructure/   # Dockhand API client, configuration, secret storage, self-update and PATH setup
 ├── tests/
 │   ├── DockhandCLI.UnitTests/
 │   └── DockhandCLI.IntegrationTests/ # full CLI runs against a mocked HttpMessageHandler

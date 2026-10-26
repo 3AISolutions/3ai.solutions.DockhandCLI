@@ -4,6 +4,7 @@ using DockhandCLI.Core.Interfaces;
 using DockhandCLI.Infrastructure.Api;
 using DockhandCLI.Infrastructure.Authentication;
 using DockhandCLI.Infrastructure.Configuration;
+using DockhandCLI.Infrastructure.SelfManagement;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DockhandCLI.Infrastructure;
@@ -44,6 +45,16 @@ public static class ServiceCollectionExtensions
             }))
             // The built-in HTTP logging is replaced by the client's own, which never logs headers.
             .RemoveAllLoggers();
+
+        // Self-update talks to GitHub only; release downloads redirect to GitHub's download host.
+        services.AddHttpClient(SelfUpdater.HttpClientName, client =>
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd($"DockhandCLI/{version}");
+                client.Timeout = TimeSpan.FromMinutes(10);
+            })
+            .RemoveAllLoggers();
+        services.AddSingleton(sp => new SelfUpdater(sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<IProcessRunner>()));
+        services.AddSingleton<PathInstaller>();
 
         return services;
     }

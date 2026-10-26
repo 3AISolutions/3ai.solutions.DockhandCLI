@@ -47,6 +47,8 @@ internal static class CommandCatalog
         new("stacks down", "<stack>", "Take a stack down"),
         new("jobs show", "<job-id>", "Show a background job"),
         new("jobs cancel", "<job-id>", "Request cancellation of a background job"),
+        new("self path", "", "Add this executable's folder to your PATH (--remove to take it off)"),
+        new("self update", "", "Update dockhand to the latest release (--check, --force)"),
         new("health", "", "Check the health of the endpoint"),
         new("system", "", "Show Dockhand host, runtime and Docker information"),
     ];
