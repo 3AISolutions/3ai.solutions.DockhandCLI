@@ -267,6 +267,45 @@ dockhand [srv02] > /exit
 
 ## Docker update workflow
 
+### Find a container and update it
+
+After pushing a new image to your registry (under the tag the container already uses, e.g. `:latest`),
+find the container and run the command `dockhand` prints for it:
+
+```text
+$ dockhand containers search myapp
+╭─────────────────┬───────────┬──────────────────────────────────────┬───────────╮
+│ Environment     │ Container │ Image                                │ State     │
+├─────────────────┼───────────┼──────────────────────────────────────┼───────────┤
+│ hhdocker01 (1)  │ myapp     │ registry.example.com/myapp:latest    │ ● running │
+╰─────────────────┴───────────┴──────────────────────────────────────┴───────────╯
+1 container(s) match 'myapp'.
+
+Check for a new image and update (add --check-only to only check, --yes to skip the question):
+  dockhand -srv01 --env hhdocker01 update container myapp
+```
+
+- `containers search <text>` (alias `containers find`) matches part of the container name **or image**,
+  case-insensitively, in every environment of the endpoint. `--env` limits it to one environment;
+  `--all-endpoints` searches every registered endpoint. In the shell, type `/search`.
+- `update container <c>` runs a fresh update check of the container's environment (Dockhand has no
+  single-container check, so the whole environment is checked), shows the result for that container,
+  and updates it only when Dockhand reports a new image. It asks first unless `--yes` is given.
+  - `--check-only` reports and stops; `--force` updates even when no new image is found.
+  - It ends by printing the command line to use in scripts.
+
+From a PowerShell script in your own solution, use [samples/Update-DockhandContainer.ps1](samples/Update-DockhandContainer.ps1):
+
+```powershell
+./Update-DockhandContainer.ps1 -Server srv01 -Environment hhdocker01 -Container myapp
+./Update-DockhandContainer.ps1 -Server srv01 -Environment hhdocker01 -Container myapp -Image registry.example.com/myapp:latest  # docker push first
+```
+
+or call the CLI directly: `dockhand -srv01 --env hhdocker01 update container myapp --yes --output json`
+returns `{ "updateAvailable": …, "updated": …, "check": {…}, "command": "…" }` and a non-zero exit code on failure.
+
+### All update commands
+
 ```bash
 dockhand -srv01 check updates                 # fresh check (POST /api/containers/check-updates)
 dockhand -srv01 check updates --cached        # results of the last check, no new check
@@ -278,6 +317,7 @@ dockhand -srv01 check apply update docker nginx --dry-run
 dockhand -srv01 check apply update docker nginx           # asks for confirmation
 dockhand -srv01 check apply update docker nginx --yes     # no question (automation)
 dockhand -srv01 update apply nginx                        # short form, same code path
+dockhand -srv01 update container nginx --yes              # check first; update only if there is a new image
 ```
 
 Statuses: **update available** (a new image for the current tag), **held** (waiting for Dockhand's
@@ -370,12 +410,14 @@ dockhand -srv01 check updates -o json \
 | `endpoint logout <alias>` | Remove the stored token |
 | `env list` / `env show <env>` | Docker environments of the endpoint |
 | `containers list` | Containers (`--running`) |
+| `containers search <text>` | Find containers by name or image in every environment, with the command to update each (`--all-endpoints`) |
 | `containers inspect <c>` | Raw Docker inspect JSON |
 | `containers logs <c>` | Logs (`-n/--tail`, `--since`, `--until`) |
 | `containers start\|stop\|restart\|pause\|unpause <c>` | Lifecycle; stop, restart and pause ask for confirmation (`-y`) |
 | `check updates` | Update check (`--pending`, `--cached`, `--updates-only`, `--all-envs`) |
 | `check apply update docker <c>` | Apply an update (`--dry-run`, `-y`) |
 | `update apply <c>` | Same as above |
+| `update container <c>` | Check one container and update it if there is a new image (`--check-only`, `--force`, `-y`) |
 | `images list` | Images with tags, size, creation date |
 | `stacks list` / `stacks show <s>` | Compose stacks; `show` prints the compose file |
 | `stacks start <s>` | Start a stack |
@@ -444,6 +486,7 @@ DockhandCLI.slnx
 │   ├── DockhandCLI.UnitTests/
 │   └── DockhandCLI.IntegrationTests/ # full CLI runs against a mocked HttpMessageHandler
 ├── docs/                             # requirements, API analysis, OpenAPI snapshot
+├── samples/                          # Update-DockhandContainer.ps1 for use from other solutions
 └── .github/workflows/                # CI and release
 ```
 

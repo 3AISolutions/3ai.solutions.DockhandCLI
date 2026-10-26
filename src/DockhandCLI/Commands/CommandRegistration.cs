@@ -10,6 +10,8 @@ internal static class CommandRegistration
         config.AddExample("-srv01", "check", "updates");
         config.AddExample("-srv01", "--all-envs", "check", "updates", "--output", "json");
         config.AddExample("-srv01", "check", "apply", "update", "docker", "nginx", "--dry-run");
+        config.AddExample("containers", "search", "myapp");
+        config.AddExample("-srv01", "--env", "hhdocker01", "update", "container", "myapp", "--yes");
 
         config.AddBranch("endpoint", endpoint =>
         {
@@ -44,6 +46,10 @@ internal static class CommandRegistration
             containers.SetDescription("Containers of a Docker environment");
             containers.AddCommand<ContainerListCommand>("list").WithAlias("ls").WithDescription("List containers")
                 .WithExample("-srv01", "--env", "1", "containers", "list");
+            containers.AddCommand<ContainerSearchCommand>("search").WithAlias("find")
+                .WithDescription("Find containers by name or image in every environment, with the command to update each")
+                .WithExample("containers", "search", "myapp")
+                .WithExample("containers", "search", "registry.example.com/myapp", "--all-endpoints");
             containers.AddCommand<ContainerInspectCommand>("inspect").WithDescription("Show the Docker inspect data (JSON)");
             containers.AddCommand<ContainerLogsCommand>("logs").WithDescription("Show container logs")
                 .WithExample("-srv01", "containers", "logs", "nginx", "--tail", "50");
@@ -79,6 +85,11 @@ internal static class CommandRegistration
             update.SetDescription("Container updates (short form)");
             update.AddCommand<ApplyUpdateCommand>("apply").WithDescription("Update a container to its latest image")
                 .WithExample("-srv01", "update", "apply", "nginx");
+            update.AddCommand<UpdateContainerCommand>("container")
+                .WithDescription("Check one container for a new image and update it if there is one")
+                .WithExample("-srv01", "--env", "hhdocker01", "update", "container", "myapp")
+                .WithExample("-srv01", "--env", "hhdocker01", "update", "container", "myapp", "--check-only")
+                .WithExample("-srv01", "--env", "hhdocker01", "update", "container", "myapp", "--yes", "--output", "json");
         });
 
         config.AddBranch("images", images =>

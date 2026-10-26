@@ -116,7 +116,7 @@ public class CommandCatalogTests
     [Fact]
     public void Next_words_follow_the_tree()
     {
-        Assert.Equal(["apply"], CommandCatalog.NextWords(["update"]));
+        Assert.Equal(["apply", "container"], CommandCatalog.NextWords(["update"]));
         Assert.Contains("set-env", CommandCatalog.NextWords(["endpoint"]));
     }
 }

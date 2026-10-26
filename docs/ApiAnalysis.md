@@ -80,6 +80,8 @@ CLI mapping:
 | `check updates --pending` | `GET pending-updates` |
 | `check updates --all-envs` | the above per environment from `GET /api/environments`, grouped by server/env, partial failures reported per env |
 | `check apply update docker <container>` / `update apply <container>` | resolve name → id via `GET /api/containers?env=`, confirm, then `batch-update` with one id |
+| `containers search <text>` | `GET /api/environments`, then `GET /api/containers?env=&all=true` per environment (per endpoint with `--all-endpoints`); name/image substring match is client-side |
+| `update container <container>` | resolve as above, `POST check-updates` for its environment (no per-container check exists), then `batch-update` with one id only if that container's result has `hasUpdate` (or `--force`) |
 
 Apply rules: exact name or id match only (no fuzzy / prefix guessing; ambiguous → error listing candidates);
 `--dry-run` sends no mutating request; confirmation unless `--yes`; success reported only from the

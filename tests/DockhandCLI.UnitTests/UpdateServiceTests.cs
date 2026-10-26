@@ -178,3 +178,40 @@ public class UpdateServiceTests
         await Assert.ThrowsAsync<DockhandException>(() => _service.CheckAsync(_api, _api.Environments, UpdateCheckMode.Fresh));
     }
 }
+
+public class CommandLinesTests
+{
+    private static readonly List<DockerEnvironment> Environments =
+    [
+        new() { Id = 1, Name = "hhdocker01" },
+        new() { Id = 2, Name = "Prod Server" },
+        new() { Id = 3, Name = "42" },
+        new() { Id = 4, Name = "dup" },
+        new() { Id = 5, Name = "DUP" },
+    ];
+
+    [Theory]
+    [InlineData(1, "hhdocker01")]
+    [InlineData(2, "2")]
+    [InlineData(3, "3")]
+    [InlineData(4, "4")]
+    public void Environment_name_is_used_only_when_it_is_a_plain_unique_token(int id, string expected) =>
+        Assert.Equal(expected, CommandLines.EnvironmentSelector(Environments.Single(e => e.Id == id), Environments));
+
+    [Fact]
+    public void Update_command_uses_the_alias_shorthand_and_falls_back_to_the_container_id()
+    {
+        var plain = new ContainerSummary { Id = "abc123", Name = "/myapp" };
+        var odd = new ContainerSummary { Id = "def456", Name = "my app" };
+
+        Assert.Equal("dockhand -srv01 --env hhdocker01 update container myapp", CommandLines.UpdateContainer("srv01", "hhdocker01", plain));
+        Assert.Equal("dockhand -srv01 --env 2 update container def456", CommandLines.UpdateContainer("srv01", "2", odd));
+    }
+
+    [Theory]
+    [InlineData("APP", true)]
+    [InlineData("registry.example.com/my", true)]
+    [InlineData("redis", false)]
+    public void Search_matches_name_or_image_ignoring_case(string term, bool expected) =>
+        Assert.Equal(expected, ContainerSearch.IsMatch(new ContainerSummary { Name = "/myapp", Image = "registry.example.com/myapp:latest" }, term));
+}

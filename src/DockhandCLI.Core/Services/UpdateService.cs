@@ -112,7 +112,7 @@ public sealed record UpdateOutcome
     public BatchUpdateItem? Result { get; init; }
 }
 
-/// <summary>Container update checks and updates. Shared by <c>check ...</c> and <c>update apply</c>.</summary>
+/// <summary>Container update checks and updates. Shared by <c>check ...</c>, <c>update apply</c> and <c>update container</c>.</summary>
 public sealed class UpdateService
 {
     public async Task<UpdateCheckReport> CheckAsync(
@@ -213,6 +213,19 @@ public sealed class UpdateService
         }
 
         return new UpdatePlan(api.Endpoint.Alias, environment, container, pending, known);
+    }
+
+    /// <summary>
+    /// Runs a fresh check of the plan's environment and returns the plan's container from it, or null when Dockhand
+    /// did not check it. Dockhand has no per-container check, so every container of the environment is checked.
+    /// </summary>
+    public async Task<UpdateRow?> CheckContainerAsync(IDockhandApi api, UpdatePlan plan, IProgress<JobProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var summary = await api.CheckUpdatesAsync(plan.Environment.Id, progress, cancellationToken).ConfigureAwait(false);
+        var name = plan.Container.Name.TrimStart('/');
+        var result = summary.Results.FirstOrDefault(r => r.ContainerId == plan.Container.Id)
+            ?? summary.Results.FirstOrDefault(r => r.ContainerName.TrimStart('/') == name);
+        return result is null ? null : FromCheckResult(result);
     }
 
     /// <summary>

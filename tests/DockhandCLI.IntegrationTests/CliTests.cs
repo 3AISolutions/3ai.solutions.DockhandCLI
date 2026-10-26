@@ -316,6 +316,135 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public async Task Search_finds_containers_in_every_environment_and_prints_update_commands()
+    {
+        await _host.WithEndpointsAsync();
+
+        var result = await _host.RunAsync("containers", "search", "NGIN");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("dockhand -srv01 --env hhdocker01 update container nginx", result.Stdout);
+        Assert.Contains("dockhand -srv01 --env hhdocker02 update container nginx", result.Stdout);
+        Assert.DoesNotContain("redis", result.Stdout);
+        Assert.Contains(_host.Server.Requests, r => r.PathAndQuery == "/api/containers?env=2&all=true");
+    }
+
+    [Fact]
+    public async Task Search_matches_image_and_spans_all_endpoints_in_json()
+    {
+        await _host.WithEndpointsAsync();
+
+        var result = await _host.RunAsync("containers", "search", "redis:7", "--all-endpoints", "-o", "json");
+
+        Assert.Equal(0, result.ExitCode);
+        AssertValidJson(result.Stdout);
+        using var json = JsonDocument.Parse(result.Stdout);
+        var matches = json.RootElement.GetProperty("matches").EnumerateArray().ToList();
+        Assert.Equal(4, matches.Count);
+        Assert.Equal(4, json.RootElement.GetProperty("environmentsSearched").GetInt32());
+        Assert.Contains(matches, m => m.GetProperty("updateCommand").GetString() == "dockhand -srv02 --env hhdocker02 update container redis");
+    }
+
+    [Fact]
+    public async Task Search_reports_failed_environments_and_missing_matches()
+    {
+        await _host.WithEndpointsAsync();
+        _host.Server.OnJson(HttpMethod.Get, "/api/containers?env=2&all=true", new { error = "Docker unreachable" }, HttpStatusCode.InternalServerError);
+
+        var partial = await _host.RunAsync("containers", "search", "nginx");
+        var none = await _host.RunAsync("containers", "search", "nothing-like-this", "--env", "1");
+
+        Assert.Equal(ExitCodes.PartialFailure, partial.ExitCode);
+        Assert.Contains("Docker unreachable", partial.Stdout);
+        Assert.Contains("update container nginx", partial.Stdout);
+        Assert.Equal(ExitCodes.NotFound, none.ExitCode);
+        Assert.Equal(ExitCodes.Usage, (await _host.RunAsync("-srv01", "containers", "search", "x", "--all-endpoints")).ExitCode);
+    }
+
+    private void CheckReturns(bool hasUpdate) =>
+        _host.Server.OnJson(HttpMethod.Post, "/api/containers/check-updates?env=1", new
+        {
+            total = 2,
+            updatesFound = hasUpdate ? 1 : 0,
+            results = new object[]
+            {
+                new { containerId = "a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6", containerName = "nginx", imageName = "nginx:latest", hasUpdate, currentDigest = "sha256:111111111111aaaa", newDigest = hasUpdate ? "sha256:222222222222bbbb" : null },
+                new { containerId = "0f0e0d0c0b0a09080706050403020100", containerName = "redis", imageName = "redis:7", hasUpdate = false },
+            },
+        });
+
+    private void BatchUpdateSucceeds() =>
+        _host.Server.OnJson(HttpMethod.Post, "/api/containers/batch-update?env=1", new
+        {
+            success = true,
+            results = new[] { new { containerId = "a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6", containerName = "nginx", success = true } },
+            summary = new { total = 1, success = 1, failed = 0 },
+        });
+
+    [Fact]
+    public async Task Update_container_updates_when_the_check_finds_a_new_image()
+    {
+        await _host.WithEndpointsAsync();
+        CheckReturns(hasUpdate: true);
+        BatchUpdateSucceeds();
+
+        var result = await _host.RunAsync("-srv01", "--env", "hhdocker01", "update", "container", "nginx", "--yes");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("recreated", result.Stdout);
+        Assert.Contains("dockhand -srv01 --env hhdocker01 update container nginx --yes", result.Stdout);
+        var request = Assert.Single(_host.Server.Matching(HttpMethod.Post, "/api/containers/batch-update"));
+        Assert.Equal("{\"containerIds\":[\"a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6\"]}", request.Body);
+    }
+
+    [Fact]
+    public async Task Update_container_does_nothing_when_up_to_date_unless_forced()
+    {
+        await _host.WithEndpointsAsync();
+        CheckReturns(hasUpdate: false);
+        BatchUpdateSucceeds();
+
+        var upToDate = await _host.RunAsync("-srv01", "update", "container", "nginx", "--yes");
+        Assert.Equal(0, upToDate.ExitCode);
+        Assert.Contains("nothing to update", upToDate.Stdout);
+        Assert.Empty(_host.Server.Matching(HttpMethod.Post, "/api/containers/batch-update"));
+
+        var forced = await _host.RunAsync("-srv01", "update", "container", "nginx", "--yes", "--force");
+        Assert.Equal(0, forced.ExitCode);
+        Assert.Single(_host.Server.Matching(HttpMethod.Post, "/api/containers/batch-update"));
+    }
+
+    [Fact]
+    public async Task Update_container_check_only_reports_without_updating()
+    {
+        await _host.WithEndpointsAsync();
+        CheckReturns(hasUpdate: true);
+
+        var result = await _host.RunAsync("-srv01", "update", "container", "nginx", "--check-only", "-o", "json");
+
+        Assert.Equal(0, result.ExitCode);
+        AssertValidJson(result.Stdout);
+        using var json = JsonDocument.Parse(result.Stdout);
+        Assert.True(json.RootElement.GetProperty("updateAvailable").GetBoolean());
+        Assert.False(json.RootElement.GetProperty("updated").GetBoolean());
+        Assert.Equal("dockhand -srv01 --env hhdocker01 update container nginx", json.RootElement.GetProperty("command").GetString());
+        Assert.Empty(_host.Server.Matching(HttpMethod.Post, "/api/containers/batch-update"));
+    }
+
+    [Fact]
+    public async Task Update_container_needs_yes_without_a_terminal()
+    {
+        await _host.WithEndpointsAsync();
+        CheckReturns(hasUpdate: true);
+
+        var result = await _host.RunAsync("-srv01", "update", "container", "nginx");
+
+        Assert.Equal(ExitCodes.Usage, result.ExitCode);
+        Assert.Contains("--yes", result.Stderr);
+        Assert.Empty(_host.Server.Matching(HttpMethod.Post, "/api/containers/batch-update"));
+    }
+
+    [Fact]
     public async Task Stop_requires_confirmation_but_start_does_not()
     {
         await _host.WithEndpointsAsync();

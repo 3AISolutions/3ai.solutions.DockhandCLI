@@ -8,7 +8,7 @@ internal sealed record Completion(int ReplaceFrom, IReadOnlyList<string> Candida
 internal sealed class ShellCompleter(Func<IReadOnlyList<string>> aliases)
 {
     private static readonly string[] GlobalOptions =
-        ["--server", "--env", "--all-envs", "--output", "--timeout", "--verbose", "--no-color", "--help", "--yes", "--dry-run", "--pending", "--cached"];
+        ["--server", "--env", "--all-envs", "--output", "--timeout", "--verbose", "--no-color", "--help", "--yes", "--dry-run", "--pending", "--cached", "--check-only", "--force", "--all-endpoints"];
 
     private static readonly HashSet<string> OptionsWithValue = new(StringComparer.OrdinalIgnoreCase)
     {
