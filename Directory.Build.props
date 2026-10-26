@@ -7,7 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>3AI Solutions</Authors>
     <Company>3AI Solutions</Company>
     <Product>DockhandCLI</Product>
